@@ -1,0 +1,99 @@
+name: Model Training and Evaluation Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      learningRate:
+        description: 'Learning Rate'
+        required: true
+        default: '0.001'
+      epochs:
+        description: 'Number of epochs'
+        required: true
+        default: '5'
+
+jobs:
+  data_processing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install pandas scikit-learn
+
+      - name: Data Preprocessing
+        run: |
+          python3 create-dataset.py
+
+      - name: Upload Data Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: data
+          path: data
+
+  model_training:
+    needs: data_processing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install tensorflow pandas
+
+      - name: Download Data Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: data
+          path: data
+
+      - name: Train Model
+        run: |
+          python3 train_model.py --learning_rate ${{ github.event.inputs.learningRate }} --epochs ${{ github.event.inputs.epochs }}
+
+      - name: Upload Model Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: model
+          path: model
+
+  model_evaluation:
+    needs: model_training
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install pandas tensorflow scikit-learn numpy
+
+      - name: Download Data Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: data
+          path: data
+
+      - name: Download Model Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: model
+          path: model
+
+      - name: Evaluate Model
+        run: |
+          python3 predict.py
+
+      - name: Upload Evaluation Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: evaluation
+          path: |
+            data/y_pred.csv
+            data/confusion_matrix.csv
